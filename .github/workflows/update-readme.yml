@@ -1,0 +1,42 @@
+name: Update README from portfolio API
+
+on:
+  schedule:
+    # Every 6 hours — frequent enough to reflect new projects/skills/experience soon
+    # after they're added in the portfolio admin panel, without hammering the API.
+    - cron: "17 */6 * * *"
+  workflow_dispatch: {} # allows a manual "Run workflow" click for on-demand refresh
+  push:
+    branches: [main]
+    paths:
+      - "scripts/update-readme.mjs"
+      - ".github/workflows/update-readme.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  update-readme:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Fetch live portfolio data and regenerate README sections
+        id: update
+        run: node scripts/update-readme.mjs | tee /tmp/update-readme.log
+
+      - name: Commit and push if changed
+        run: |
+          if grep -q "README_CHANGED=true" /tmp/update-readme.log; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add README.md
+            git commit -m "chore: sync README with latest portfolio data"
+            git push
+          else
+            echo "No changes to commit — portfolio data unchanged since last sync."
+          fi
